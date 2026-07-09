@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# path to your virtual environment
+venv_path="$HOME/Documents/code/chatthing/idk/bin/activate"
+
+# "0.0.0.0" means listen on all network interfaces (wifi, ethernet, etc)
+# we export these so open-webui sees them
+export HOST="0.0.0.0"
+export PORT="8080"
+
+# this is the url we check for startup
+# we still check localhost locally because 0.0.0.0 isn't a valid browser address
+check_url="http://localhost:8080/"
+
+# activate the virtual environment
+source "$venv_path"
+
+echo "starting open-webui on 0.0.0.0..."
+open-webui serve &
+
+# capture the process id
+server_pid=$!
+
+echo "waiting for server to respond..."
+
+# loop until server is ready
+until curl -s -o /dev/null "$check_url"; do
+    sleep 1
+done
+
+echo "server is up!"
+echo "on this pc, use: http://localhost:8080"
+echo "on your phone, use: http://<your-pc-ip>:8080"
+
+# open firefox locally
+firefox --new-window "$check_url"
+
+echo "server is running with pid: $server_pid"
+echo "keep this terminal open. press ctrl+c to stop the server."
+
+wait $server_pid

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Define the installation directory
+# Use quotes to handle the space in "keyboard thing"
+INSTALL_DIR="$HOME/Downloads/keyboard thing/apex7tkl_linux"
+
+# Check if the user asked for help
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    echo "Usage: steeledit <command> [arguments]"
+    echo ""
+    echo "Commands:"
+    echo "  oled <image_path>      : Set OLED image"
+    echo "  oledtext <text>        : Write text to screen"
+    echo "  oledblank              : Clear screen"
+    echo "  color <key> <hex>      : Set key color"
+    echo "  config <args>          : Set config"
+    exit 0
+fi
+
+# Switch to the directory, redirecting output to silence unless it fails
+cd "$INSTALL_DIR" || { echo "Error: Could not find directory $INSTALL_DIR"; exit 1; }
+
+# Run the python script with sudo
+# "$@" passes ALL arguments (1, 2, 3...) exactly as typed, preserving quotes
+sudo python cli.py "$1" "$2"

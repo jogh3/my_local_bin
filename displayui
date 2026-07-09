@@ -1,0 +1,268 @@
+#!/bin/bash
+
+clear
+site="https://apibay.org/q.php?q="
+title=""
+resolution=""
+title="$1"
+resolution="$2"
+if ! pgrep -x "transmission-da" > /dev/null; then
+    transmission-daemon
+    # Give it 1 second to wake up fully
+    sleep 1
+fi
+function lookup {
+title=$(echo "$title" | tr " " "+")
+search="${site}${title}%20${resolution}"
+
+hidecursor="\e[?25l"
+showcursor="\e[?25h"
+
+trap 'echo -ne "$showcursor"; exit' EXIT INT TERM
+echo -ne "$hidecursor"
+
+titles=()
+sizes=()
+hashes=()
+seechers=()
+while IFS='|' read -r t s h se le; do
+  #echo $t
+  titles+=("$t")
+  sizes+=("$s")
+  hashes+=("$h")
+  seechers+=("$se/$le")
+done < <(./back q $search)
+}
+function debugarrs {
+    for i in {0..10}; do
+    echo "Item $i: ${titles[i]} | ${sizes[i]} | ${hashes[i]}"
+    done
+}
+
+revcl="\e[30;47m"
+normcl="\e[0m"
+uibuffer=""
+
+function repeat {
+  local i
+  for (( i=0; i < $1; i++ )); do
+    uibuffer+="$3"
+    uibuffer+="$2"
+    if [[ $3 != "" ]]; then
+      uibuffer+="$normcl"
+    fi
+  done
+}
+function placebar {
+  uibuffer+="+"
+  repeat $1 "-"
+  if [[ $2 == "n" ]]; then
+    uibuffer+="+"
+  else
+    uibuffer+="+"$'\n'
+  fi
+}
+
+curpage=0
+itemcount=0
+active=0
+selectedresult=0
+dlinprog=0
+
+function flippage {
+  ((itemcount+=$availablerows))
+  ((curpage+=1))
+  if (( $curpage > $pageamount )); then
+    curpage=0
+    itemcount=0
+  fi
+  i=0
+}
+
+function backpage {
+  ((itemcount-=$availablerows))
+  ((curpage-=1))
+  if (( $curpage < 0 )); then
+    curpage=$pageamount
+    itemcount=$(($availablerows*$pageamount))
+  fi
+  i=0
+}
+
+function dl {
+  local clean_title="${title//\//-}"
+  local dlpath="$HOME/Videos/films/${clean_title}_${resolution}"
+  local arrayitem=$(($itemcount+$selectedresult))
+  mkdir -p "$dlpath" 
+  thash=${hashes[$arrayitem]}
+  if [[ -n $thash ]]; then
+    local magnet="magnet:?xt=urn:btih:${thash}"
+    transmission-remote --add "$magnet" --download-dir "$dlpath" -s &> /dev/null &
+  fi
+  dlinprog=1
+}
+
+function drawui {
+  uibuffer=""
+  termwidth=$(tput cols)
+  termheight=$(tput lines)
+  maxsize=$(((termwidth * 60)/100))
+  titstring="| title:"
+  resstring="resolution:"
+  whitesize=$(($maxsize-${#resstring}-1-${#titstring}))
+  tittextsize=$((((whitesize * 85)/100)))
+  restextsize=$((($whitesize - $tittextsize)))
+  local titcl=""
+  local rescl=""
+  if [[ $active == 0 ]]; then
+    titcl=$revcl
+  elif [[ $active == 1 ]]; then
+    rescl=$revcl
+  fi
+  # uibuffer+="$termwidth $maxsize $((${#resstring}+1)) ${#titstring} $whitesize"
+  # uibuffer+="titsize $tittextsize | ressize $restextsize"
+  barsize=$(($maxsize-2))
+  # uibuffer+=$barsize
+  placebar $barsize
+  uibuffer+="$titstring"
+  uibuffer+="$titcl ${title:0:$tittextsize}$normcl"
+  repeat $(($tittextsize-${#title}-1)) " " $titcl
+  uibuffer+="$resstring"
+  uibuffer+="$rescl ${resolution:0:$restextsize}$normcl"
+  repeat $(($restextsize-${#resolution}-1)) " " $rescl
+  uibuffer+="|"$'\n'
+  placebar $barsize
+  uibuffer+="| "
+  
+  # Col 1 Header: "results: " (Left Aligned)
+  local h_tit="results: "
+  uibuffer+="$h_tit"
+  repeat $(($titlessize - ${#h_tit})) " "
+  
+  # Col 2 Header: "size: " (RIGHT ALIGNED to match data)
+  local h_size="size: "
+  repeat $(($sizesize - ${#h_size}+2)) " "
+  uibuffer+="$h_size"
+  
+  # Col 3 Header: "s/l: " (RIGHT ALIGNED to match data)
+  local h_sl="s/l: "
+  repeat $(($seechersize - ${#h_sl})) " "
+  uibuffer+="$h_sl"
+  
+  uibuffer+="|"$'\n'
+  resultsize=$(($barsize - 3))
+  titlessize=$((($resultsize * 80) / 100))
+  restofsize=$(($resultsize - $titlessize))
+  sizesize=$(($restofsize/2))
+  seechersize=$(($restofsize-$sizesize))
+  availablerows=$(($termheight-7))
+  if [[ ${#titles[@]} -gt 0 ]]; then
+      pageamount=$((${#titles[@]} / $availablerows))
+  else
+      pageamount=0
+  fi
+  local rowcl=""
+  for ((i = 0; i < $availablerows; i++)); do
+    rowcl=""
+    arrayitem=$(($i+$itemcount))
+    displaytitle=${titles[arrayitem]:0:$titlessize}
+    uibuffer+="| "
+    if [[ $active == 2  ]] && [[ $selectedresult == $i ]]; then
+      rowcl=$revcl
+    fi
+    uibuffer+="$rowcl"
+    uibuffer+="$displaytitle " 
+    repeat $(($titlessize-${#displaytitle})) " " 
+    displaysize=${sizes[arrayitem]:0:$sizesize}
+    repeat $(($sizesize-${#displaysize})) " "
+    uibuffer+="$displaysize"
+    
+    displayseechers=${seechers[arrayitem]:0:$seechersize}
+    repeat $(($seechersize-${#displayseechers})) " "
+    uibuffer+="$displayseechers"
+    uibuffer+="$normcl"
+    uibuffer+=" |"$'\n'
+  done
+  pgdisplay="page $curpage/$pageamount"
+  empty=$(($barsize-${#pgdisplay}))
+  fsplit=$(($empty/2))
+  ssplit=$(($empty-$fsplit))
+  placebar $barsize
+  uibuffer+="|"
+  repeat $fsplit " "
+  uibuffer+=$pgdisplay
+  inprogtxt=""
+  if (( dlinprog == 1 )); then
+    inprogtxt=" download is in progress"
+    uibuffer+="$inprogtxt"
+  fi
+  repeat $(($ssplit-${#inprogtxt})) " "
+  uibuffer+="|"$'\n'
+  placebar $barsize "n"
+  clear
+  echo -ne "$uibuffer"
+}
+
+escchar=$(printf "\u1b")
+backspace=$(printf "\x7f")
+
+while true; do
+  drawui
+  IFS= read -rsn1 -t 0.5 key
+  readstat=$?
+  if (( readstat != 0 )); then
+    continue
+  fi
+  if [[ "$key" == "q" ]]; then
+     exit 0 
+  elif [[ "$key" == $escchar ]]; then
+     read -rsn2 key
+     if [[ "$key" == "[C" ]]; then
+       flippage
+     elif [[ "$key" == "[D" ]]; then
+       backpage
+     elif [[ "$key" == "[A" ]]; then
+       if (( active == 2 )); then
+        ((selectedresult-=1))
+        if (( $selectedresult < 0 )); then
+          items_on_page=$(( ${#titles[@]} - itemcount ))
+          if (( items_on_page > availablerows )); then
+             items_on_page=$availablerows
+          fi
+          selectedresult=$(( items_on_page - 1 ))
+        fi
+       fi
+     elif [[ "$key" == "[B" ]]; then
+       if (( active == 2 )); then
+        ((selectedresult+=1))
+        if (( selectedresult >= availablerows )) || (( (itemcount + selectedresult) >= ${#titles[@]} )); then
+          selectedresult=0
+        fi
+       fi
+     fi
+  elif [[ "$key" == $'\t' ]]; then
+    active=$(((active+1)%3))
+
+  elif [[ "$key" == $backspace ]]; then
+    if (( active == 0 )); then
+      title=${title%?}
+    elif (( active == 1 )); then
+      resolution=${resolution%?}
+    fi
+   elif [[ "$key" == "" ]]; then
+     if [[ -n "$title" ]] && (( active != 2 )); then
+       lookup
+       curpage=0
+       itemcount=0
+       active=2
+     elif (( active == 2 )); then
+       dl
+     fi
+   elif [[ "$key" =~ [[:print:]] ]]; then
+     if (( active == 0 )); then
+       title+="$key"
+     elif (( active == 1 )); then
+       resolution+="$key"
+     fi
+  fi
+done

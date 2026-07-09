@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [[ $XDG_SESSION_TYPE == "wayland" ]]; then
+  wl-paste | tr -d '\r' | while read -r target; do
+    if [ -n "$target" ]; then
+      clean_target=$(echo "$target" | sed 's|^file://||')
+      printf -v decoded_target '%b' "${clean_target//%/\\x}"
+      echo "$decoded_target"
+      if [ -e "$decoded_target" ]; then
+      ln -s "$decoded_target" .
+      fi
+    fi
+  done
+elif [[ $XDG_SESSION_TYPE == "x11" ]]; then
+    xclip -selection clipboard -t text/uri-list -o | tr -d '\r' | while read -r target; do
+      if [ -n "$target" ]; then
+        cleantarget=$(echo "$target" | sed 's|^file://||')
+        printf -v decoded_target '%b' "${clean_target//%/\\x}"
+        ln -s "$cleantarget" .
+      fi
+    done
+fi

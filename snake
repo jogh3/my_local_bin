@@ -1,0 +1,4 @@
+#!/bin/bash
+
+echo "launching snake"
+/home/joe/Documents/code/snake/snake

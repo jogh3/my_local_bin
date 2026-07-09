@@ -1,0 +1,9 @@
+#!/bin/bash
+
+channel=$1
+svdir=/home/joe/Videos/ytdl/
+cname=$(echo $1 | grep -o @.* | cut -d/ -f1 | tr -d "@")
+mkdir -p "${svdir}/${cname}"
+
+cd "${svdir}/${cname}"
+yt-dlp -f mp4 --download-archive "history.txt" --cookies-from-browser firefox "$channel"

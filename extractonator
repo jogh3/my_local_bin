@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Enable nullglob so globs that match nothing expand to nothing
+shopt -s nullglob
+
+# Collect all supported archive types in one array
+archives=( *.zip *.tar.gz *.tar.xz *.tar.bz2 *.tgz *.gz )
+
+# Check if we found any
+if [ ${#archives[@]} -eq 0 ]; then
+    echo "no unzippable or extractable files found"
+    exit 1
+fi
+
+# Loop through each archive
+for f in "${archives[@]}"; do
+    # derive directory name (strip common extensions)
+    dir="$f"
+    dir="${dir%.zip}"
+    dir="${dir%.tar.gz}"
+    dir="${dir%.tar.xz}"
+    dir="${dir%.tar.bz2}"
+    dir="${dir%.tgz}"
+    dir="${dir%.gz}"
+
+    # If folder doesn't exist, extract based on type
+    if [ ! -d "$dir" ]; then
+        case "$f" in
+            *.zip)
+                echo "unzipping $f → $dir"
+                unzip -n "$f" -d "$dir"
+                ;;
+            *.tar.gz|*.tgz)
+                echo "extracting $f → $dir"
+                mkdir -p "$dir"
+                tar -xzf "$f" -C "$dir"
+                ;;
+            *.tar.xz)
+                echo "extracting $f → $dir"
+                mkdir -p "$dir"
+                tar -xJf "$f" -C "$dir"
+                ;;
+            *.tar.bz2)
+                echo "extracting $f → $dir"
+                mkdir -p "$dir"
+                tar -xjf "$f" -C "$dir"
+                ;;
+            *.gz)
+                echo "extracting $f → $dir"
+                mkdir -p "$dir"
+                gunzip -c "$f" > "$dir/$(basename "$dir")"
+                ;;
+            *)
+                echo "Skipping $f — unsupported type."
+                ;;
+        esac
+    else
+        echo "skipping $f — folder '$dir' already exists"
+    fi
+done

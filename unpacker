@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# function to find a unique filename if a collision exists
+get_unique_name() {
+    local target="$1"
+    local filename=$(basename -- "$target")
+    local name="${filename%.*}"
+    local ext=""
+    
+    # extract extension if present
+    if [[ "$filename" == *.* ]]; then
+        ext=".${filename##*.}"
+    fi
+
+    # if the file name is available, use it
+    if [[ ! -e "$filename" ]]; then
+        echo "$filename"
+        return
+    fi
+
+    # increment (n) until a unique name is found
+    local i=1
+    while [[ -e "${name}(${i})${ext}" ]]; do
+        ((i++))
+    done
+
+    echo "${name}(${i})${ext}"
+}
+
+# loop through directories
+for dir in */; do
+    if [ -d "$dir" ]; then
+        # count files inside (non-recursive, files only)
+        file_count=$(find "$dir" -maxdepth 1 -type f | wc -l)
+
+        # process if count is 3 or fewer
+        if [ "$file_count" -le 3 ]; then
+            
+            # loop through all items, including hidden files
+            for item in "$dir"* "$dir".*; do
+                
+                # ensure the glob matched an actual file
+                [ -e "$item" ] || continue
+                
+                # skip directory pointers
+                item_base=$(basename "$item")
+                if [[ "$item_base" == "." || "$item_base" == ".." ]]; then
+                    continue
+                fi
+
+                # move only if it is a file
+                if [ -f "$item" ]; then
+                    new_name=$(get_unique_name "$item")
+                    mv "$item" "./$new_name"
+                fi
+            done
+
+            # attempt to remove the directory if empty
+            rmdir "$dir" 2>/dev/null
+        fi
+    fi
+done

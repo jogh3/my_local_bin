@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Change 'firefox' to your browser of choice
+BROWSER="firefox"
+FILE=$1
+COUNT=0
+
+while read -r url; do
+    # Skip empty lines
+    [[ -z "$url" ]] && continue
+
+    $BROWSER "$url" &
+    ((COUNT++))
+
+    # Every 10 links, wait for user input
+    if (( COUNT % 10 == 0 )); then
+        echo "Opened $COUNT links. Press [Enter] to open the next 10..."
+        read -r < /dev/tty
+    fi
+done < "$FILE"
+
+echo "Finished opening all links."

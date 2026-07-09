@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+cd /home/mount/drive1/localimg/stable-diffusion-webui/
+./venv/bin/python launch.py --medvram --opt-sdp-attention --always-batch-cond-uncond --skip-torch-cuda-test

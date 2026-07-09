@@ -1,0 +1,8 @@
+#!/bin/bash
+
+sleep 5
+
+firefox >/dev/null 2>&1 & disown
+steam -silent >/dev/null 2>&1 & disown
+
+exit

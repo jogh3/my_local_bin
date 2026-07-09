@@ -1,0 +1,8 @@
+#!/bin/bash
+
+cd /home/joe/.local/share/plasma/plasmoids/org.kde.plasma.taskmanager_custom/contents/build || exit
+cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release ..
+make
+sudo make install
+plasmashell --replace > /dev/null 2>&1 & disown
+echo "Done! Task Manager recompiled."

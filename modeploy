@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# --- 1. CONFIGURATION: SET THESE PATHS ---
+# Make sure to use the full Linux paths.
+
+# Path to your modsettings.lsx file (the "brains")
+MOD_SETTINGS_FILE="/home/joe/.local/share/Steam/steamapps/compatdata/1086940/pfx/drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3/PlayerProfiles/Public/modsettings.lsx"
+
+# Path to your Vortex Mod Staging Folder (where all the mod folders are stored)
+STAGING_FOLDER="/home/joe/.local/share/Steam/steamapps/compatdata/1086940/pfx/drive_c/bg3_mods"
+
+# Path to the game's actual "Mods" folder (the "destination")
+GAME_MODS_FOLDER="/home/joe/.local/share/Steam/steamapps/compatdata/1086940/pfx/drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3/Mods"
+
+# --- 2. SCRIPT LOGIC ---
+
+# First, purge all old links from the game's Mods folder.
+# This removes mods you've disabled in Vortex.
+# It will NOT touch vortex.deployment.json.
+echo "Purging old links from $GAME_MODS_FOLDER"
+rm -f "$GAME_MODS_FOLDER"/*.pak
+
+# Read the modsettings.lsx file and get the value of every "Folder" attribute.
+echo "Reading active mods from modsettings.lsx..."
+# This is the corrected XPath query
+MOD_FOLDERS=$(xmlstarlet sel -t -m "//node[@id='Mods']/children/node/attribute[@id='Folder']" -v "@value" -n "$MOD_SETTINGS_FILE")
+
+echo "Linking active mods..."
+
+# Loop through each folder name provided by the xml
+while read -r folder_name; do
+    # Skip the base game itself, which is always listed
+    if [ "$folder_name" == "Gustav" ] || [ "$folder_name" == "GustavX" ]; then
+        continue
+    fi
+
+    MOD_DIR="$STAGING_FOLDER/$folder_name"
+
+    # Check if the mod's staging directory actually exists
+    if [ -d "$MOD_DIR" ]; then
+        # Find ALL.pak files within that specific mod's folder
+        # This now correctly handles mods with multiple.pak files
+        find "$MOD_DIR" -type f -name "*.pak" -print0 | while IFS= read -r -d $'\0' pak_file; do
+            PAK_NAME=$(basename "$pak_file")
+            echo "  Linking: $PAK_NAME (from $folder_name)"
+            # Create the hardlink in the game's Mods folder
+            ln -f "$pak_file" "$GAME_MODS_FOLDER/$PAK_NAME"
+        done
+    else
+        echo "  Warning: Directory not found for mod '$folder_name'. Skipping."
+    fi
+done <<< "$MOD_FOLDERS"
+
+echo "--------------------------------"
+echo "Manual deployment complete."
+echo "You can now launch the game."

@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# helper function to calculate the path
+get_relative_path() {
+  local target="$1"
+  local base="$2"
+  realpath --relative-to="$base" "$target"
+}
+
+current_dir=$(pwd)
+
+if [[ $XDG_SESSION_TYPE == "wayland" ]]; then
+  wl-paste | tr -d '\r' | while read -r target; do
+    if [ -n "$target" ]; then
+
+      clean_target=$(echo "$target" | sed 's|^file://||')
+      printf -v decoded_target '%b' "${clean_target//%/\\x}"
+
+      if [ -e "$decoded_target" ]; then
+        # calculate the relative path from here to the target
+        rel_target=$(get_relative_path "$decoded_target" "$current_dir")
+        if [ "$rel_target" != "." ]; then
+          ln -s "$rel_target" .
+        fi
+      fi
+    fi
+  done
+elif [[ $XDG_SESSION_TYPE == "x11" ]]; then
+  xclip -selection clipboard -t text/uri-list -o | tr -d '\r' | while read -r target; do
+    if [ -n "$target" ]; then
+      clean_target=$(echo "$target" | sed 's|^file://||')
+      printf -v decoded_target '%b' "${clean_target//%/\\x}"
+      
+      if [ -e "$decoded_target" ]; then
+        # calculate the relative path from here to the target
+        rel_target=$(get_relative_path "$decoded_target" "$current_dir")
+        if [ "$rel_target" != "." ]; then
+          ln -s "$rel_target" .
+        fi
+      fi
+    fi
+  done
+fi
